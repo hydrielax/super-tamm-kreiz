@@ -14,9 +14,6 @@ import { LogError } from "./utils/logError.ts";
 import { JSONResponse } from "./utils/jsonResponse.ts";
 import { parseDate } from "./utils/parseDate.ts";
 
-const MAX_ITEMS_UPDATED = 1900;
-let itemsUpdated = 0;
-
 // This function serves as the main entry point for the Supabase Edge Function
 Deno.serve(async () => {
   try {
@@ -28,7 +25,7 @@ Deno.serve(async () => {
 
     // Fetch the list of events from the external API
     const events = await fetchEvents();
-    events.forEach(async (event, i) => {
+    events.slice(0, 200).forEach(async (event, i) => {
       if (i % 20 == 0)
         console.info(`Processing event ${i + 1} of ${events.length}`);
       await checkAndUpdateEvent(event, supabase);
@@ -47,8 +44,6 @@ async function checkAndUpdateEvent(
   event: TkShortEvent,
   supabase: SupabaseClient
 ) {
-  if (itemsUpdated >= MAX_ITEMS_UPDATED) return; // Limit the number of items updated
-
   const id = event.eve_id;
   const lastUpdate = new Date(event.eve_datemaj);
 
@@ -64,26 +59,25 @@ async function checkAndUpdateEvent(
     // Fetch event details
     const details = await fetchEventDetails(id);
     await saveEvent(details, supabase);
-    itemsUpdated += 1;
   }
 }
 
 // Save event details to the database
 async function saveEvent(event: TkFullEvent, supabase: SupabaseClient) {
   const { error: eventError } = await supabase.from("Event").upsert({
-    id: event.id,
+    id: parseInt(event.id),
     last_update: new Date(),
     date: parseDate(event.date, event.heure),
     description: event.libelle,
     price: event.prix_fr,
     town: event.ville,
-    town_latitude: event.latitude,
-    town_longitude: event.longitude,
+    town_latitude: parseFloat(event.latitude),
+    town_longitude: parseFloat(event.longitude),
     departement: event.departement,
     place: event.place,
     place_address: event.adresse1,
-    place_latitude: event.place_latitude,
-    place_longitude: event.place_longitude,
+    place_latitude: parseFloat(event.place_latitude),
+    place_longitude: parseFloat(event.place_longitude),
     country_code: event.codepays,
     country_name: event.nompays,
     category_id: await getCategoryId(event.type, supabase),
@@ -136,14 +130,14 @@ async function saveArtists(
 
     const { error } = await supabase
       .from("Artist")
-      .upsert({ id: artist.id, name: artist.lenom });
+      .upsert({ id: parseInt(artist.id), name: artist.lenom });
 
     if (error)
       throw new LogError(`Error upserting artist with ID ${artist.id}:`, error);
 
     const { error: participationError } = await supabase
       .from("ArtistParticipation")
-      .upsert({ event_id: eventId, artist_id: artist.id });
+      .upsert({ event_id: parseInt(eventId), artist_id: parseInt(artist.id) });
 
     if (participationError)
       throw new LogError(
@@ -163,7 +157,7 @@ async function saveOrganizers(
     const organizer = organizerWrapper.organisateur;
 
     const { error } = await supabase.from("Organizer").upsert({
-      id: organizer.id,
+      id: parseInt(organizer.id),
       name: organizer.libelle,
       website: organizer.site,
       phone: organizer.afftelephone == "1" ? organizer.telephone : "",
@@ -179,7 +173,10 @@ async function saveOrganizers(
 
     const { error: eventOrganizerError } = await supabase
       .from("EventOrganizer")
-      .upsert({ event_id: eventId, organizer_id: organizer.id });
+      .upsert({
+        event_id: parseInt(eventId),
+        organizer_id: parseInt(organizer.id),
+      });
 
     if (eventOrganizerError)
       throw new LogError(
