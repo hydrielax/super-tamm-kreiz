@@ -5,76 +5,17 @@
 // Setup type definitions for built-in Supabase Runtime APIs
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient, SupabaseClient } from "jsr:@supabase/supabase-js@2";
+import { TkFullEvent, TkShortEvent } from "./domain/TkEvent.ts";
+import { fetchEventDetails } from "./infra/fetchEvent.ts";
+import { fetchEvents } from "./infra/fetchEvents.ts";
+import { TkArtist } from "./domain/TkArtist.ts";
+import { TkOrganizer } from "./domain/TkOrganizer.ts";
+import { LogError } from "./utils/logError.ts";
+import { JSONResponse } from "./utils/jsonResponse.ts";
+import { parseDate } from "./utils/parseDate.ts";
 
 const MAX_ITEMS_UPDATED = 1900;
 let itemsUpdated = 0;
-
-type TkShortEvent = {
-  eve_id: string;
-  eve_datemaj: string;
-  eve_date: string;
-};
-
-type TkFullEvent = {
-  date: string;
-  eve_prix: string;
-  heure: string;
-  id: string;
-  type: string;
-  libelle: string;
-  ville: string;
-  latitude: string;
-  longitude: string;
-  departement: string;
-  codepays: string;
-  nompays: string;
-  place: string;
-  adresse1: string;
-  adresse2: string;
-  infos: string;
-  place_latitude: string;
-  place_longitude: string;
-  prix_fr: string;
-  artistes: TkArtist[];
-  organisateurs: TkOrganizer[];
-};
-
-type TkArtist = {
-  artiste: {
-    id: string;
-    lenom: string;
-  };
-};
-
-type TkOrganizer = {
-  organisateur: {
-    id: string;
-    libelle: string;
-    site: string;
-    telephone: string;
-    mobile: string;
-    email: string;
-    afftelephone: string;
-    affemail: string;
-    affmobile: string;
-  };
-};
-
-class LogError extends Error {
-  constructor(message: string, error: Partial<Error> | undefined = undefined) {
-    console.error(message, error);
-    super(message + " " + error?.message);
-  }
-}
-
-class JSONResponse extends Response {
-  constructor(body: any, status: number = 200) {
-    super(JSON.stringify(body), {
-      headers: { "Content-Type": "application/json" },
-      status,
-    });
-  }
-}
 
 // This function serves as the main entry point for the Supabase Edge Function
 Deno.serve(async () => {
@@ -100,24 +41,6 @@ Deno.serve(async () => {
     return new Response(String(err?.message ?? err), { status: 500 });
   }
 });
-
-// Fetch list of events from the external API
-async function fetchEvents() {
-  const response = await fetch(
-    "https://kasour.tamm-kreiz.bzh/app/getevents.php?type_periode=all"
-  );
-  const data = await response.json();
-  return data.evenements as TkShortEvent[];
-}
-
-// Fetch detailed event data from the API
-async function fetchEventDetails(id: string) {
-  const response = await fetch(
-    `https://kasour.tamm-kreiz.bzh/app/getevent.php?id=${id}`
-  );
-  const data = await response.json();
-  return data.evenement as TkFullEvent;
-}
 
 // Check if event exists and is updated
 async function checkAndUpdateEvent(
@@ -264,49 +187,6 @@ async function saveOrganizers(
         eventOrganizerError
       );
   }
-}
-
-function normalizeHour(heure: string): string {
-  if (!heure || heure.trim() === "") return "00:00";
-
-  let normalized = heure.replace(" ", "").replace(/h|H/g, ":");
-  if (normalized.endsWith(":")) {
-    normalized += "00";
-  } else if (!normalized.includes(":")) {
-    normalized += ":00";
-  }
-  return normalized;
-}
-
-function getParisTimezoneOffset(date: Date) {
-  // Yes, this is complicated. But it's the only way to get the timezone offset for France, trust me.
-  const parisFormatter = new Intl.DateTimeFormat("en-US", {
-    timeZone: "Europe/Paris",
-    timeZoneName: "short",
-  });
-  const parts = parisFormatter.formatToParts(date);
-  const timeZoneOffset = parts.find(
-    (part) => part.type === "timeZoneName"
-  )!.value;
-
-  const offsetInHours = timeZoneOffset.includes("+")
-    ? parseInt(timeZoneOffset.split("+")[1])
-    : parseInt(timeZoneOffset.split("-")[1]) * -1;
-  const offsetInMinutes = offsetInHours * 60;
-
-  return offsetInMinutes;
-}
-
-function parseDate(dateString: string, hourString: string): Date {
-  const date = new Date(
-    `${dateString.split(" ")[0]} ${normalizeHour(hourString)}Z`
-  );
-  if (isNaN(date.getTime()))
-    throw new LogError(`Invalid date: ${dateString} ${hourString}`);
-
-  const offset = getParisTimezoneOffset(date);
-  date.setMinutes(date.getMinutes() - offset);
-  return date;
 }
 
 /* To invoke locally:
