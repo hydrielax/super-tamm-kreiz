@@ -27,6 +27,6 @@ export type TkFullEvent = {
   place_latitude: string;
   place_longitude: string;
   prix_fr: string;
-  artistes: TkArtist[];
-  organisateurs: TkOrganizer[];
+  artistes: { artiste: TkArtist }[];
+  organisateurs: { organisateur: TkOrganizer }[];
 };
