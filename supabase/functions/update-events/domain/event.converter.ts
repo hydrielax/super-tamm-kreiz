@@ -7,7 +7,7 @@ export const convertEvent = (event: TkFullEvent): SpEvent => ({
   last_update: event.datemaj,
   date: parseDate(event.date, event.heure),
   description: event.libelle,
-  price: event.prix_fr,
+  price: event.prix_fr != "inconnu" ? event.prix_fr : "",
   town: event.ville,
   town_latitude: parseFloat(event.latitude),
   town_longitude: parseFloat(event.longitude),
