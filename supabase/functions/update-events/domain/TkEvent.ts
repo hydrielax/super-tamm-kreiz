@@ -9,7 +9,8 @@ export type TkShortEvent = {
 
 export type TkFullEvent = {
   date: string;
-  eve_prix: string;
+  datemaj: string;
+  dpr_id: string; // 1=Fest-Noz/Diez, 3=Concert, 5=Bagad/Cercles celtiques
   heure: string;
   id: string;
   type: string;
@@ -26,7 +27,12 @@ export type TkFullEvent = {
   infos: string;
   place_latitude: string;
   place_longitude: string;
+  couvert: boolean;
+  parking: boolean;
+  capacite: string;
+  parquet: boolean;
   prix_fr: string;
-  artistes: { artiste: TkArtist }[];
-  organisateurs: { organisateur: TkOrganizer }[];
+  url_affiche: string;
+  artistes: TkArtist[];
+  organisateurs: TkOrganizer[];
 };

@@ -1,5 +1,10 @@
 import { LogError } from "./logError.ts";
 
+const parisFormatter = new Intl.DateTimeFormat("en-US", {
+  timeZone: "Europe/Paris",
+  timeZoneName: "short",
+});
+
 function normalizeHour(heure: string): string {
   if (!heure || heure.trim() === "") return "00:00";
 
@@ -14,10 +19,6 @@ function normalizeHour(heure: string): string {
 
 function getParisTimezoneOffset(date: Date) {
   // Yes, this is complicated. But it's the only way to get the timezone offset for France, trust me.
-  const parisFormatter = new Intl.DateTimeFormat("en-US", {
-    timeZone: "Europe/Paris",
-    timeZoneName: "short",
-  });
   const parts = parisFormatter.formatToParts(date);
   const timeZoneOffset = parts.find(
     (part) => part.type === "timeZoneName"
@@ -31,10 +32,13 @@ function getParisTimezoneOffset(date: Date) {
   return offsetInMinutes;
 }
 
-export function parseDate(dateString: string, hourString: string): Date {
-  const date = new Date(
-    `${dateString.split(" ")[0]} ${normalizeHour(hourString)}Z`
-  );
+export function parseDate(
+  dateString: string,
+  hourString: string | undefined = undefined
+): Date {
+  const date = hourString
+    ? new Date(`${dateString.split(" ")[0]} ${normalizeHour(hourString)}Z`)
+    : new Date(`${dateString}Z`);
   if (isNaN(date.getTime()))
     throw new LogError(`Invalid date: ${dateString} ${hourString}`);
 

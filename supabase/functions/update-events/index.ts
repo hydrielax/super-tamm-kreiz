@@ -8,11 +8,14 @@ import { createClient, SupabaseClient } from "jsr:@supabase/supabase-js@2";
 import { TkFullEvent, TkShortEvent } from "./domain/TkEvent.ts";
 import { fetchTkEventDetails } from "./infra/fetchTkEvent.ts";
 import { fetchTkEvents } from "./infra/fetchTkEvents.ts";
-import { TkArtist } from "./domain/TkArtist.ts";
-import { TkOrganizer } from "./domain/TkOrganizer.ts";
 import { LogError } from "./utils/logError.ts";
 import { JSONResponse } from "./utils/jsonResponse.ts";
-import { parseDate } from "./utils/parseDate.ts";
+import { convertOrganizer } from "./domain/organizer.converter.ts";
+import { convertArtist } from "./domain/artist.converter.ts";
+import { convertEvent } from "./domain/event.converter.ts";
+import { SpArtist } from "./domain/SpArtist.ts";
+import { SpOrganizer } from "./domain/SpOrganizer.ts";
+import { SpEvent } from "./domain/SpEvent.ts";
 
 // Main entry point for the Supabase Edge Function
 Deno.serve(async () => {
@@ -22,23 +25,13 @@ Deno.serve(async () => {
       Deno.env.get("SUPABASE_ANON_KEY") ?? ""
     );
 
-    console.info("Fetching events from Tamm-Kreiz API...");
     const tkEvents = await fetchTkEvents();
-    console.info(`Fetched ${tkEvents.length} events`);
+    console.info(`Fetched ${tkEvents.length} events from Tamm Kreiz`);
 
-    console.info("Fetching existing events from the database...");
-    const supabaseEvents = await fetchSupabaseEvents(supabase);
-    console.info(`Fetched ${supabaseEvents.size} existing events`);
-
-    console.info("Get events to update...");
-    const eventsToUpdate = getEventsToUpdate(tkEvents, supabaseEvents).slice(
-      0,
-      50
-    );
-    console.info(`Events to update: ${eventsToUpdate.length}`);
-    console.info("Processing events...");
+    const spEvents = await fetchSpEvents(supabase);
+    const eventsToUpdate = getEventsToUpdate(tkEvents, spEvents).slice(0, 100);
+    console.log(`Updating or creating ${eventsToUpdate.length} events`);
     await processEvents(eventsToUpdate, supabase);
-    console.info("Events processed successfully");
 
     return new JSONResponse({ message: "Events processed successfully" });
   } catch (err) {
@@ -47,26 +40,26 @@ Deno.serve(async () => {
 });
 
 // Fetch existing events from the database
-const fetchSupabaseEvents = async (supabase: SupabaseClient) => {
+const fetchSpEvents = async (supabase: SupabaseClient) => {
   const { data, error } = await supabase
     .from("Event")
     .select("id, last_update");
 
   if (error) throw new LogError("Error fetching existing events:", error);
-  return new Map<string, Date>(
-    data.map((event) => [event.id, new Date(event.last_update)])
+  return new Map<number, string>(
+    data.map((event) => [event.id, event.last_update])
   );
 };
 
 // Determine which events need to be updated
 const getEventsToUpdate = (
   tkEvents: TkShortEvent[],
-  supabaseEvents: Map<string, Date>
+  supabaseEvents: Map<number, string>
 ) =>
   tkEvents.filter((event) => {
-    const tkLastUpdate = new Date(event.eve_datemaj);
-    const supabaseLastUpdate = supabaseEvents.get(event.eve_id);
-    return !supabaseLastUpdate || tkLastUpdate > supabaseLastUpdate;
+    const tkLastUpdate = event.eve_datemaj;
+    const spLastUpdate = supabaseEvents.get(parseInt(event.eve_id));
+    return !spLastUpdate || tkLastUpdate > spLastUpdate;
   });
 
 // Process events in batches
@@ -78,16 +71,17 @@ const processEvents = async (
     events.map((event) => fetchTkEventDetails(event.eve_id))
   );
 
+  let buffer = createEmptyData();
+  for (const event of eventDetailsList) {
+    buffer = await aggregateEventData(supabase, buffer, event);
+  }
   const {
     eventsData,
     artistsData,
     organizersData,
     artistParticipationsData,
     eventOrganizersData,
-  } = await eventDetailsList.reduce(
-    aggregateEventData(supabase),
-    Promise.resolve(createEmptyData())
-  );
+  } = buffer;
 
   // Upsert events, artists, and organizers
   await Promise.all([
@@ -104,99 +98,61 @@ const processEvents = async (
 };
 
 // Aggregate event data using a reducer function
-const aggregateEventData =
-  (supabase: SupabaseClient) => async (acc: any, details: TkFullEvent) => {
-    console.debug("Accumulator: ", acc);
-    const categoryId = await getOrInsertCategory(
-      details.type,
-      supabase,
-      acc.categoriesCache
+const aggregateEventData = async (
+  supabase: SupabaseClient,
+  buffer: {
+    eventsData: SpEvent[];
+    artistsData: Map<number, SpArtist>;
+    organizersData: Map<number, SpOrganizer>;
+    artistParticipationsData: { artist_id: number; event_id: number }[];
+    eventOrganizersData: { organizer_id: number; event_id: number }[];
+    categoriesCache: Map<string, number>;
+  },
+  event: TkFullEvent
+) => {
+  const categoryId = await getOrInsertCategory(
+    event.type,
+    supabase,
+    buffer.categoriesCache
+  );
+
+  buffer.eventsData.push(convertEvent(event, categoryId));
+
+  event.artistes.forEach((artist) => {
+    if (!buffer.artistsData.has(parseInt(artist.id))) {
+      buffer.artistsData.set(parseInt(artist.id), convertArtist(artist));
+    }
+    buffer.artistParticipationsData.push(
+      createArtistParticipationData(event.id, artist.id)
     );
+  });
 
-    acc.eventsData.push(createEventData(details, categoryId));
-
-    details.artistes.forEach((artistWrapper) => {
-      const artist = artistWrapper.artiste;
-      if (!acc.artistsData.has(parseInt(artist.id))) {
-        acc.artistsData.set(parseInt(artist.id), createArtistData(artist));
-      }
-      acc.artistParticipationsData.push(
-        createArtistParticipationData(details.id, artist.id)
+  event.organisateurs.forEach((organizer) => {
+    if (!buffer.organizersData.has(parseInt(organizer.id))) {
+      buffer.organizersData.set(
+        parseInt(organizer.id),
+        convertOrganizer(organizer)
       );
-    });
+    }
+    buffer.eventOrganizersData.push(
+      createEventOrganizerData(event.id, organizer.id)
+    );
+  });
 
-    details.organisateurs.forEach((organizerWrapper) => {
-      const organizer = organizerWrapper.organisateur;
-      if (!acc.organizersData.has(parseInt(organizer.id))) {
-        acc.organizersData.set(
-          parseInt(organizer.id),
-          createOrganizerData(organizer)
-        );
-      }
-      acc.eventOrganizersData.push(
-        createEventOrganizerData(details.id, organizer.id)
-      );
-    });
-
-    return acc;
-  };
+  return buffer;
+};
 
 // Initialize empty data structures
 const createEmptyData = () => ({
-  eventsData: [],
-  artistsData: new Map<number, { id: number; name: string }>(),
-  organizersData: new Map<
-    number,
-    {
-      id: number;
-      name: string;
-      website: string;
-      phone: string;
-      cell_phone: string;
-      email: string;
-    }
-  >(),
-  artistParticipationsData: [],
-  eventOrganizersData: [],
+  eventsData: new Array<SpEvent>(),
+  artistsData: new Map<number, SpArtist>(),
+  organizersData: new Map<number, SpOrganizer>(),
+  artistParticipationsData: new Array<{
+    artist_id: number;
+    event_id: number;
+  }>(),
+  eventOrganizersData: new Array<{ organizer_id: number; event_id: number }>(),
   categoriesCache: new Map<string, number>(),
-});
-
-// Helper functions to create various entities
-const createEventData = (details: TkFullEvent, categoryId: number) => ({
-  id: parseInt(details.id),
-  last_update: new Date(),
-  date: parseDate(details.date, details.heure),
-  description: details.libelle,
-  price: details.prix_fr,
-  town: details.ville,
-  town_latitude: parseFloat(details.latitude),
-  town_longitude: parseFloat(details.longitude),
-  department: details.departement,
-  place: details.place,
-  place_address: details.adresse1,
-  place_latitude: details.place_latitude
-    ? parseFloat(details.place_latitude)
-    : details.latitude,
-  place_longitude: details.place_longitude
-    ? parseFloat(details.place_longitude)
-    : details.longitude,
-  country_code: details.codepays,
-  country_name: details.nompays,
-  category_id: categoryId,
-});
-
-const createArtistData = (artist: TkArtist) => ({
-  id: parseInt(artist.id),
-  name: artist.lenom,
-});
-
-const createOrganizerData = (organizer: TkOrganizer) => ({
-  id: parseInt(organizer.id),
-  name: organizer.libelle,
-  website: organizer.site,
-  phone: organizer.afftelephone === "1" ? organizer.telephone : "",
-  cell_phone: organizer.affmobile === "1" ? organizer.mobile : "",
-  email: organizer.affemail === "1" ? organizer.email : "",
 });
 
 const createArtistParticipationData = (eventId: string, artistId: string) => ({
