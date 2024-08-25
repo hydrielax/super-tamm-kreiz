@@ -36,7 +36,7 @@ Deno.serve(async () => {
     console.info(`Fetched ${tkEvents.length} events from Tamm Kreiz`);
 
     const spEvents = await fetchSpEvents(supabase);
-    const eventsToUpdate = getEventsToUpdate(tkEvents, spEvents).slice(0, 100);
+    const eventsToUpdate = getEventsToUpdate(tkEvents, spEvents).slice(0, 50);
     console.log(`Updating or creating ${eventsToUpdate.length} events`);
     await processEvents(eventsToUpdate, supabase);
 
