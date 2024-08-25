@@ -71,17 +71,13 @@ const processEvents = async (
     events.map((event) => fetchTkEventDetails(event.eve_id))
   );
 
-  let buffer = createEmptyData();
-  for (const event of eventDetailsList) {
-    buffer = await aggregateEventData(supabase, buffer, event);
-  }
   const {
     eventsData,
     artistsData,
     organizersData,
     artistParticipationsData,
     eventOrganizersData,
-  } = buffer;
+  } = eventDetailsList.reduce(aggregateEventData, createEmptyData());
 
   // Upsert events, artists, and organizers
   await Promise.all([
@@ -98,25 +94,17 @@ const processEvents = async (
 };
 
 // Aggregate event data using a reducer function
-const aggregateEventData = async (
-  supabase: SupabaseClient,
+const aggregateEventData = (
   buffer: {
     eventsData: SpEvent[];
     artistsData: Map<number, SpArtist>;
     organizersData: Map<number, SpOrganizer>;
     artistParticipationsData: { artist_id: number; event_id: number }[];
     eventOrganizersData: { organizer_id: number; event_id: number }[];
-    categoriesCache: Map<string, number>;
   },
   event: TkFullEvent
 ) => {
-  const categoryId = await getOrInsertCategory(
-    event.type,
-    supabase,
-    buffer.categoriesCache
-  );
-
-  buffer.eventsData.push(convertEvent(event, categoryId));
+  buffer.eventsData.push(convertEvent(event));
 
   event.artistes.forEach((artist) => {
     if (!buffer.artistsData.has(parseInt(artist.id))) {
@@ -152,7 +140,6 @@ const createEmptyData = () => ({
     event_id: number;
   }>(),
   eventOrganizersData: new Array<{ organizer_id: number; event_id: number }>(),
-  categoriesCache: new Map<string, number>(),
 });
 
 const createArtistParticipationData = (eventId: string, artistId: string) => ({
@@ -164,40 +151,6 @@ const createEventOrganizerData = (eventId: string, organizerId: string) => ({
   event_id: parseInt(eventId),
   organizer_id: parseInt(organizerId),
 });
-
-// Get or insert a category and return its ID
-const getOrInsertCategory = async (
-  category: string,
-  supabase: SupabaseClient,
-  categoriesCache: Map<string, number>
-) => {
-  if (categoriesCache.has(category)) return categoriesCache.get(category)!;
-
-  const { data, error } = await supabase
-    .from("EventCategory")
-    .select("id")
-    .eq("name", category)
-    .maybeSingle();
-
-  if (error) throw new LogError(`Error fetching category ${category}:`, error);
-
-  if (!data) {
-    const { data: insertData, error: insertError } = await supabase
-      .from("EventCategory")
-      .insert([{ name: category, type: "Fest-Noz et Fest-Deiz" }])
-      .select("id")
-      .single();
-
-    if (insertError)
-      throw new LogError(`Error inserting category ${category}:`, insertError);
-
-    categoriesCache.set(category, insertData.id);
-    return insertData.id as number;
-  }
-
-  categoriesCache.set(category, data.id);
-  return data.id as number;
-};
 
 /* To invoke locally:
 

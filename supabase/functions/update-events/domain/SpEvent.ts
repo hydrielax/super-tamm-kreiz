@@ -14,5 +14,6 @@ export type SpEvent = {
   place_longitude: number;
   country_code: string;
   country_name: string;
-  category_id: number;
+  category: number;
+  sub_category: string;
 };
