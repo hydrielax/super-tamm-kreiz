@@ -1,6 +1,6 @@
 import { parseDate } from "../utils/parseDate.ts";
 import { SpEvent } from "./SpEvent.ts";
-import { TkFullEvent } from "./TkEvent.ts";
+import { TkFullEvent } from "../infra/TkEvent.ts";
 
 export const convertEvent = (event: TkFullEvent): SpEvent => ({
   id: parseInt(event.id),

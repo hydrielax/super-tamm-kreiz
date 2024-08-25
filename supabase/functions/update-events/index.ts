@@ -1,3 +1,9 @@
+/**
+ * This script fetches events from the Tamm Kreiz API and updates the Supabase database.
+ *
+ * The Supabase database is used as Backend-for-Frontend (BFF) to serve the mobile app.
+ */
+
 // Follow this setup guide to integrate the Deno language server with your editor:
 // https://deno.land/manual/getting_started/setup_your_environment
 // This enables autocomplete, go to definition, etc.
@@ -5,7 +11,7 @@
 // Setup type definitions for built-in Supabase Runtime APIs
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient, SupabaseClient } from "jsr:@supabase/supabase-js@2";
-import { TkFullEvent, TkShortEvent } from "./domain/TkEvent.ts";
+import { TkFullEvent, TkShortEvent } from "./infra/TkEvent.ts";
 import { fetchTkEventDetails } from "./infra/fetchTkEvent.ts";
 import { fetchTkEvents } from "./infra/fetchTkEvents.ts";
 import { LogError } from "./utils/logError.ts";

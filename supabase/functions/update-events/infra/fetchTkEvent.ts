@@ -1,4 +1,4 @@
-import { TkFullEvent } from "../domain/TkEvent.ts";
+import { TkFullEvent } from "./TkEvent.ts";
 
 // Fetch detailed event data from the API
 export async function fetchTkEventDetails(

@@ -1,5 +1,5 @@
+import { TkArtist } from "../infra/TkArtist.ts";
 import { SpArtist } from "./SpArtist.ts";
-import { TkArtist } from "./TkArtist.ts";
 
 export const convertArtist = (artist: TkArtist): SpArtist => ({
   id: parseInt(artist.id),

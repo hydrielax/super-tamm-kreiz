@@ -1,4 +1,4 @@
-import { TkShortEvent } from "../domain/TkEvent.ts";
+import { TkShortEvent } from "./TkEvent.ts";
 
 // Fetch list of events from the external API
 export async function fetchTkEvents() {

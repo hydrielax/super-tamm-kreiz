@@ -1,5 +1,5 @@
+import { TkOrganizer } from "../infra/TkOrganizer.ts";
 import { SpOrganizer } from "./SpOrganizer.ts";
-import { TkOrganizer } from "./TkOrganizer.ts";
 
 export const convertOrganizer = (organizer: TkOrganizer): SpOrganizer => ({
   id: parseInt(organizer.id),
