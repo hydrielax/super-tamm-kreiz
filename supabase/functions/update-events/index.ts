@@ -22,6 +22,7 @@ import { convertEvent } from "./domain/event.converter.ts";
 import { SpArtist } from "./domain/SpArtist.ts";
 import { SpOrganizer } from "./domain/SpOrganizer.ts";
 import { SpEvent } from "./domain/SpEvent.ts";
+import { hashString } from "./utils/hashString.ts";
 
 // Main entry point for the Supabase Edge Function
 Deno.serve(async () => {
@@ -113,11 +114,13 @@ const aggregateEventData = (
   buffer.eventsData.push(convertEvent(event));
 
   event.artistes.forEach((artist) => {
-    if (!buffer.artistsData.has(parseInt(artist.id))) {
-      buffer.artistsData.set(parseInt(artist.id), convertArtist(artist));
+    const artistId =
+      artist.id === -1 ? hashString(artist.lenom) : parseInt(artist.id);
+    if (!buffer.artistsData.has(artistId)) {
+      buffer.artistsData.set(artistId, convertArtist(artist));
     }
     buffer.artistParticipationsData.push(
-      createArtistParticipationData(event.id, artist.id)
+      createArtistParticipationData(event.id, artistId)
     );
   });
 
@@ -148,9 +151,9 @@ const createEmptyData = () => ({
   eventOrganizersData: new Array<{ organizer_id: number; event_id: number }>(),
 });
 
-const createArtistParticipationData = (eventId: string, artistId: string) => ({
+const createArtistParticipationData = (eventId: string, artistId: number) => ({
   event_id: parseInt(eventId),
-  artist_id: parseInt(artistId),
+  artist_id: artistId,
 });
 
 const createEventOrganizerData = (eventId: string, organizerId: string) => ({

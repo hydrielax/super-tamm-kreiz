@@ -1,5 +1,5 @@
 export type TkArtist = {
-  id: string; // can be -1 as number also, but it is parsed by parseInt correctly
+  id: string | -1;
   lenom: string;
   type?: string;
   contact?: string;
