@@ -16,4 +16,7 @@ export type SpEvent = {
   country_name: string;
   category: number;
   sub_category: string;
+  is_covered_place: boolean;
+  has_car_park: boolean;
+  has_parquet_floor: boolean;
 };
