@@ -54,7 +54,10 @@ const fetchSpEvents = async (supabase: SupabaseClient) => {
 
   if (error) throw new LogError("Error fetching existing events:", error);
   return new Map<number, string>(
-    data.map((event) => [event.id, event.last_update])
+    data.map((event: Pick<SpEvent, "id" | "last_update">) => [
+      event.id,
+      event.last_update,
+    ])
   );
 };
 
@@ -62,21 +65,34 @@ const fetchSpEvents = async (supabase: SupabaseClient) => {
 const getEventsToUpdate = (
   tkEvents: TkShortEvent[],
   supabaseEvents: Map<number, string>
-) =>
-  tkEvents.filter((event) => {
+) => {
+  const lastMonth = new Date();
+  lastMonth.setMonth(lastMonth.getMonth() - 1);
+
+  return tkEvents.filter((event) => {
     const tkLastUpdate = event.eve_datemaj;
     const spLastUpdate = supabaseEvents.get(parseInt(event.eve_id));
-    return !spLastUpdate || tkLastUpdate > spLastUpdate;
+    return (
+      (!spLastUpdate || tkLastUpdate > spLastUpdate) &&
+      new Date(event.eve_date) > lastMonth // fetch only new events
+    );
   });
+};
 
 // Process events in batches
 const processEvents = async (
   events: TkShortEvent[],
   supabase: SupabaseClient
 ) => {
-  const eventDetailsList = await Promise.all(
-    events.map((event) => fetchTkEventDetails(event.eve_id))
-  );
+  // fetch all events by batch of 20 to avoid hitting the API rate limit
+  const eventDetailsList: TkFullEvent[] = [];
+  for (let i = 0; i < events.length; i += 20) {
+    const batch = events.slice(i, i + 20);
+    const batchDetails = await Promise.all(
+      batch.map((event) => fetchTkEventDetails(event.eve_id))
+    );
+    eventDetailsList.push(...batchDetails);
+  }
 
   const {
     eventsData,
@@ -87,17 +103,35 @@ const processEvents = async (
   } = eventDetailsList.reduce(aggregateEventData, createEmptyData());
 
   // Upsert events, artists, and organizers
-  await Promise.all([
-    supabase.from("Event").upsert(eventsData),
-    supabase.from("Artist").upsert(Array.from(artistsData.values())),
-    supabase.from("Organizer").upsert(Array.from(organizersData.values())),
+  const entityTablesResults = await Promise.all([
+    supabase.from("Event").upsert(eventsData).select(),
+    supabase.from("Artist").upsert(Array.from(artistsData.values())).select(),
+    supabase
+      .from("Organizer")
+      .upsert(Array.from(organizersData.values()))
+      .select(),
   ]);
+  if (entityTablesResults.some(({ error }) => error)) {
+    throw new LogError(
+      "Error upserting events, artists, or organizers",
+      entityTablesResults.find(({ error }) => error)?.error ?? undefined
+    );
+  }
 
   // Upsert artist participations and event organizers
-  await Promise.all([
-    supabase.from("ArtistParticipation").upsert(artistParticipationsData),
-    supabase.from("EventOrganizer").upsert(eventOrganizersData),
+  const associationTablesResults = await Promise.all([
+    supabase
+      .from("ArtistParticipation")
+      .upsert(artistParticipationsData)
+      .select(),
+    supabase.from("EventOrganizer").upsert(eventOrganizersData).select(),
   ]);
+  if (associationTablesResults.some(({ error }) => error)) {
+    throw new LogError(
+      "Error upserting artist participations or event organizers",
+      associationTablesResults.find(({ error }) => error)?.error ?? undefined
+    );
+  }
 };
 
 // Aggregate event data using a reducer function
