@@ -24,7 +24,7 @@ export const convertEvent = (event: TkFullEvent): SpEvent => ({
   country_name: event.nompays,
   category: parseInt(event.dpr_id),
   sub_category: event.type,
-  is_covered_place: event.couvert,
-  has_car_park: event.parking,
-  has_parquet_floor: event.parquet,
+  is_covered_place: event.couvert ?? false,
+  has_car_park: event.parking ?? false,
+  has_parquet_floor: event.parquet ?? false,
 });

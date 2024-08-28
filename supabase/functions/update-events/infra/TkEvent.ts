@@ -27,10 +27,10 @@ export type TkFullEvent = {
   infos: string;
   place_latitude: string;
   place_longitude: string;
-  couvert: boolean;
-  parking: boolean;
+  couvert: boolean | null;
+  parking: boolean | null;
   capacite: string;
-  parquet: boolean;
+  parquet: boolean | null;
   prix_fr: string;
   url_affiche: string;
   artistes: TkArtist[];
