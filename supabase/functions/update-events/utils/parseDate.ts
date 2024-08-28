@@ -14,6 +14,10 @@ function normalizeHour(heure: string): string {
   } else if (!normalized.includes(":")) {
     normalized += ":00";
   }
+
+  // fix for "am" and "pm" times
+  normalized = normalized.replace("am", " am ").replace("pm", " pm ");
+
   return normalized;
 }
 
