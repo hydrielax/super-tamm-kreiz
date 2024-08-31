@@ -11,7 +11,7 @@ export const convertEvent = (event: TkFullEvent): SpEvent => ({
   town: event.ville,
   town_latitude: parseFloat(event.latitude),
   town_longitude: parseFloat(event.longitude),
-  department: event.departement,
+  department: event.departement ? parseInt(event.departement) : null,
   place: event.place,
   place_address: event.adresse1,
   place_latitude: event.place_latitude

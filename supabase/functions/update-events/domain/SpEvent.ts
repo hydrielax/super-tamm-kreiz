@@ -7,7 +7,7 @@ export type SpEvent = {
   town: string;
   town_latitude: number;
   town_longitude: number;
-  department: string;
+  department: number | null;
   place: string;
   place_address: string;
   place_latitude: number;
