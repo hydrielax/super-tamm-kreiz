@@ -36,11 +36,13 @@ Deno.serve(async () => {
     console.info(`Fetched ${tkEvents.length} events from Tamm Kreiz`);
 
     const spEvents = await fetchSpEvents(supabase);
-    const eventsToUpdate = getEventsToUpdate(tkEvents, spEvents).slice(0, 50);
+    const eventsToUpdate = getEventsToUpdate(tkEvents, spEvents).slice(0, 100);
     console.log(`Updating or creating ${eventsToUpdate.length} events`);
     await processEvents(eventsToUpdate, supabase);
 
-    return new JSONResponse({ message: "Events processed successfully" });
+    return new JSONResponse({
+      message: `${eventsToUpdate.length} events processed successfully`,
+    });
   } catch (err) {
     return new Response(String(err?.message ?? err), { status: 500 });
   }
