@@ -5,4 +5,5 @@ export type SpOrganizer = {
   phone_1: string;
   phone_2: string;
   email: string;
+  image_url: string;
 };

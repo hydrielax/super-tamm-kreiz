@@ -4,5 +4,6 @@ export type SpArtist = {
   website: string;
   soundcloud: string;
   facebook: string;
+  image_url: string;
   members: string[];
 };

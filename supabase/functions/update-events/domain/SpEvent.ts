@@ -19,4 +19,10 @@ export type SpEvent = {
   is_covered_place: boolean;
   has_car_park: boolean;
   has_parquet_floor: boolean;
+  place_infos: string;
+  booking_url: string;
+  image_url: string;
+  thumbnail_url: string;
+  is_partner: boolean;
+  partner_advantage: string;
 };

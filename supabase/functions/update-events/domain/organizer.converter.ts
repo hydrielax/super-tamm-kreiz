@@ -8,4 +8,5 @@ export const convertOrganizer = (organizer: TkOrganizer): SpOrganizer => ({
   phone_1: organizer.telephone ?? "",
   phone_2: organizer.mobile ?? "",
   email: organizer.email ?? "",
+  image_url: `https://www.tamm-kreiz.bzh/vuhez/media/annuaire/bihan/${organizer.id}b.jpg`,
 });

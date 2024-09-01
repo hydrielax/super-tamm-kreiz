@@ -32,7 +32,9 @@ export type TkFullEvent = {
   capacite: string;
   parquet: boolean | null;
   prix_fr: string;
-  url_affiche: string;
+  url_affiche?: string;
+  url_reservation?: string;
+  avantage?: string;
   artistes: TkArtist[];
   organisateurs: TkOrganizer[];
 };

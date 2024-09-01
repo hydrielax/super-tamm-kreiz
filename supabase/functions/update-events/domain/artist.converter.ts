@@ -8,5 +8,6 @@ export const convertArtist = (artist: TkArtist): SpArtist => ({
   website: artist.site ?? "",
   soundcloud: artist.soundcloud ?? "",
   facebook: artist.facebook ?? "",
+  image_url: `http://www.tamm-kreiz.bzh/kalon/tk.php?action=ajax_photo&id=${artist.id}&f=1`,
   members: artist.membres?.map((member) => member.nom) ?? [],
 });
